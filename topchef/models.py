@@ -1,16 +1,16 @@
 """
 Contains model classes for the API. These classes are atomic data types that
-have JSON representations written in marshmallow, and a single representation
-in the database.
+have JSON representations written in marshmallow, a single representation in
+the DB, and have a presence on the filesystem as well.
 """
 import os
 import tempfile
 import uuid
 import logging
 import json
-from uuid import UUID
-
 import jsonschema
+from . import database
+from .config import config
 from datetime import datetime, timedelta
 from flask import url_for
 from marshmallow import Schema, fields, post_dump, post_load
@@ -18,8 +18,7 @@ from marshmallow_jsonschema import JSONSchema
 from sqlalchemy import inspect, desc
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, relationship
-from . import database
-from .config import config
+from uuid import UUID
 
 LOG = logging.getLogger(__name__)
 
@@ -27,20 +26,51 @@ BASE = declarative_base(metadata=database.METADATA)
 
 
 class SchemaDirectoryOrganizer(object):
+    """
+    Responsible for managing the schema directory, allocating a directory for
+    each service. The directory is named after the service UUID. Each service
+    directory contains three types of files.
+
+    - The file given by ```REGISTRATION_SCHEMA_NAME``` contains the JSON
+        Schema to which a job must conform, given a set of parameters for the
+        job
+    - The file given by ```RESULT_SCHEMA_NAME``` contains the JSON schema to
+        which the result of a job must conform. The API will not allow the
+        compute service to POST the result unless it conforms to this schema
+
+    The initializer takes in the arguments
+
+    :var schema_directory_path: The top-level directory that this organizer
+        is to manage. The job and service files are located here
+    """
     REGISTRATION_SCHEMA_NAME = 'job_registration_schema'
     RESULT_SCHEMA_NAME = 'job_result_schema'
 
     def __init__(self, schema_directory_path):
+        """
+        Instantiates the variables described above
+        """
         self.root_path = schema_directory_path
 
     @property
     def services(self):
+        """
+        Returns a list of services that contain a schema directory on this
+        directory. Eventually, this will be used for debugging
+        """
         return [
             service_id for service_id in os.listdir(self.root_path)
                 if self._is_guid(service_id)
             ]
 
     def register_service(self, service):
+        """
+        Register a new service with this manager. Creates a directory for
+        the new service
+
+        :param topchef.models.Service service: The service for which the
+            directory is to be created
+        """
         service_directory = os.path.join(self.root_path, str(service.id))
 
         os.mkdir(service_directory)

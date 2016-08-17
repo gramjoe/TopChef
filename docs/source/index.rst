@@ -11,6 +11,11 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+API Documentation
+=================
+
+.. autoflask:: topchef.api_server:app
+   :undoc-static:
 
 
 Indices and tables

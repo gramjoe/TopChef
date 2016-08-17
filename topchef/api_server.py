@@ -1,5 +1,5 @@
 """
-Very very very basic application
+Contains the business logic for the topchef API
 """
 import logging
 from uuid import uuid1
@@ -29,7 +29,7 @@ def hello_world():
 
     .. sourcecode:: http
 
-        HTTP/1.1 / GET
+        HTTP/1.1 200 OK
         Content-Type: application/json
 
         {
@@ -41,8 +41,8 @@ def hello_world():
                 "version": "0.1dev"
             }
         }
-
-    :statuscode 200: The request was successful
+    
+    :statuscode 200: The request was successful    
     """
     return jsonify({
         'meta': {
@@ -61,15 +61,34 @@ def get_services():
 
     **Example Response**
 
-    ..sourcecode:: http
+    .. sourcecode:: http
 
-        HTTP/1.1 /services GET
+        HTTP/1.1 200 OK
         Content-Type: application/json
 
         {
             "data": {
+                "description": "Some test data",
+                "has_timed_out": true,
+                "id": "d1b691f6-60c9-11e6-93a9-3c970e7271f5",
+                "job_registration_schema": {
+                   "properties": {
+                       "value": {
+                           "maximum": 10,
+                           "minimum": 1,
+                           "type": "integer"
+                        }, 
+                        "type": "object"
+                    },
+                    "name": "TestService",
+                    "url": "http://localhost:5000/services/d1b691f6-60c9-11e6-93a9-3c970e7271f5"
+                }
             }
         }
+    
+    :statuscode 200: The response returned a list of services using the
+        schema defined above
+
     """
     session = SESSION_FACTORY()
     service_list = session.query(Service).all()
@@ -90,6 +109,66 @@ def get_services():
 @app.route('/services', methods=["POST"])
 @check_json
 def register_service():
+    """
+    Register a new service with this API. Services are atomic operations
+    that are performed by a host computer. Every service has a required
+    JSON schema describing a valid request for a computing job. The service
+    and the job registration schema have a one-to-one relationship. Each
+    service also has an optional response schema. If this schema exists,
+    then the job result cannot be placed on the server unless the response
+    matches the JSON schema. This endpoint is responsible for creating
+    services.
+
+    **Example Request**
+
+    .. sourcecode:: http
+       
+       HTTP/1.1 /services POST
+        Content-Type: application/json
+
+        {
+            "name": "TestService",
+            "description": "Some test data",
+            "job_registration_schema": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10
+                    }
+                }
+           }
+        }
+
+    **Example Response**
+
+    .. sourcecode:: http
+
+        HTTP/1.1 201 CREATED
+        Content-Type: application/json
+
+        {
+            "data": {
+                "Service Service(id=278756609616774903632739861306738373109, 
+                name=TestService, 
+                description=Some test data, 
+                schema={
+                    'type': 'object', 
+                    'properties': {
+                        'value': {
+                            'type': 'integer', 
+                            'maximum': 10, 
+                            'minimum': 1
+                        }
+                    }
+                }) successfully registered"
+            }
+        }
+
+    :statuscode 201: The service was created successfully
+    :statuscode 400: An incorrect request was sent to create the server
+    """
     session = SESSION_FACTORY()
 
     new_service, errors = Service.DetailedServiceSchema().load(request.json)
@@ -133,6 +212,36 @@ def register_service():
 
 @app.route('/services/<service_id>', methods=["GET"])
 def get_service_data(service_id):
+    """
+    Return information for a particular service with a known service_id
+    
+    **Example Response**
+    
+    .. sourcecode:: http
+       
+       HTTP/1.1 200 OK
+        Content-type: application/json
+        
+        {
+            "data": {
+            "description": "Some test data",
+            "has_timed_out": true,
+            "id": "d1b691f6-60c9-11e6-93a9-3c970e7271f5",
+            "job_registration_schema": {
+                "properties": {
+                "value": {
+                    "maximum": 10,
+                    "minimum": 1,
+                    "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "name": "TestService",
+            "url": "http://localhost:5000/services/d1b691f6-60c9-11e6-93a9-3c970e7271f5"
+            }
+        }
+    """
     session = SESSION_FACTORY()
 
     service = session.query(Service).filter_by(id=service_id).first()
